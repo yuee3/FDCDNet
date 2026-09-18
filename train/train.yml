@@ -1,0 +1,133 @@
+# general settings for RealDN training
+name: FDCDNet_Haze1k_thick
+model_type: ImageCleanModel
+scale: 1
+num_gpu: 1
+gpu_ids: [1]
+manual_seed: 100
+distortion: dehaze
+
+model: transformer_restoration # 这个通常是更底层的模型类型，不是网络结构名
+
+# dataset and data loader settings
+datasets:
+  train:
+    name: TrainSet
+    type: PairedImageDataset
+    dataroot_gt: /home/guest/NewDisk1/dataset/Haze1k_thick/dataset/train/gt
+    dataroot_lq: /home/guest/NewDisk1/dataset/Haze1k_thick/dataset/train/lq
+    geometric_augs: true
+    mode: paired_image
+    filename_tmpl: '{}'
+    io_backend:
+      type: disk
+    use_shuffle: true
+    num_worker_per_gpu: 4
+    batch_size_per_gpu: 6
+    mini_batch_sizes: [ 6,5,4,2,2 ]
+    iters: [20000,18000,18000,18000,16000]
+    gt_size: 384
+    gt_sizes: [160,192,256,320,384]
+    dataset_enlarge_ratio: 1
+    prefetch_mode: ~
+    use_hflip: True
+    use_rot: True
+  val:
+    name: ValSet
+    type: PairedImageDataset
+    dataroot_gt:  /home/guest/NewDisk1/dataset/Haze1k_thick/dataset/valid/gt
+    dataroot_lq:  /home/guest/NewDisk1/dataset/Haze1k_thick/dataset/valid/lq
+    mode: paired_image
+    scale: 1
+    io_backend:
+      type: disk
+    # gt_size and gt_sizes under val -> io_backend seems unusual, usually at val level or implied.
+    # Keeping as is if your loader expects it.
+
+# network structures
+network_g:
+  type: FDCDNet 
+  inp_channels: 3
+  out_channels: 3
+  dim: 24
+  num_blocks: [2, 3, 4] # [L1, L2, Latent/L3] blocks, assuming 3 levels of VSSBlocks in U-Net
+  heads: [2, 4, 6] # Restormer: Num heads per level for MDTA. Corresponds to num_blocks levels.
+  window_size: 8 
+  mlp_ratio: 2.66
+  use_shift_window: true 
+  attention_dropout: 0.0
+  qkv_bias: true
+  use_checkpoint: false
+  dual_pixel_task: false
+
+
+  
+  norm_type: 'LlamaRMSNorm'  
+  norm_eps: 1e-6  
+
+# path
+path:
+  root: /home/guest/NewDisk1/rubbish
+  experiments_root: /home/guest/NewDisk1/rubbish/experiments
+  models: /home/guest/NewDisk1/rubbish/experiments/models
+  training_states: /home/guest/NewDisk1/rubbish/experiments/training_states
+  log: /home/guest/NewDisk1/rubbish/experiments/log
+  pretrain_network_g: ~
+  strict_load_g: false
+  resume_state: ~
+
+# training settings
+train:
+  total_iter: 90000
+  warmup_iter: -1
+  use_grad_clip: true
+  scheduler:
+    type: CosineAnnealingLR
+    T_max: 90000
+    eta_min: !!float 1e-6
+  mixing_augs:
+    mixup: true
+    mixup_beta: 1.2
+    use_identity: true
+  optim_g:
+    type: AdamW
+    lr: !!float 2e-4
+    weight_decay: !!float 1e-4
+    betas: [0.9, 0.999]
+  pixel_opt:
+    type: L1Loss
+    loss_weight: 1
+    reduction: mean
+
+
+# validation settings
+val:
+  # window_size: 8 # If this is for validation logic (e.g. sliding window inference), it might be independent of network arch.
+  val_freq: !!float 2e3
+  save_img: false
+  rgb2bgr: true
+  use_image: false # This seems odd, usually true if you save images or calculate metrics on them.
+  max_minibatch: 8
+  metrics:
+    psnr:
+      type: calculate_psnr
+      crop_border: 0
+      test_y_channel: false
+    ssim:
+      type: calculate_ssim
+      crop_border: 0
+      test_y_channel: false
+
+# logging settings
+logger:
+  print_freq: 50
+  save_checkpoint_freq: !!float 2e3
+  use_tb_logger: True
+  wandb:
+    project: ~
+    resume_id: ~
+
+# dist training settings
+dist_params:
+  backend: nccl
+  port: 29500

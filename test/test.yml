@@ -1,0 +1,63 @@
+# general settings
+name: test
+model_type: ImageCleanModel
+scale: 1
+num_gpu: 1
+manual_seed: 100
+
+datasets:
+  test:
+    name: Haze1k_Test
+    type: PairedImageDataset
+    dataroot_gt: /home/guest/NewDisk1/Haze1k_thin/dataset/test/clean
+    dataroot_lq: /home/guest/NewDisk1/Haze1k_thin/dataset/test/hazy
+    filename_tmpl: '{}'
+    io_backend:
+      type: disk
+
+
+network_g:
+  type: FDCDNet
+  inp_channels: 3
+  out_channels: 3
+  dim: 24
+  num_blocks: [2, 3, 4]
+  heads: [2, 4, 6]
+  window_size: 8 
+  mlp_ratio: 4.0
+  use_shift_window: true  
+  attention_dropout: 0.0
+  qkv_bias: true
+  use_checkpoint: false
+  dual_pixel_task: false
+  norm_type: 'LlamaRMSNorm'
+  norm_eps: 1e-6
+  ffn_expansion_factor: 1
+  bias: false
+  drop_path_rate: 0.1
+  num_refinement_blocks: 4
+  hilo_window_size: 4
+
+
+
+
+# path
+path:
+  pretrain_network_g: /home/guest/NewDisk1/experiments/FDCDNet_thin/models/net_g_18000.pth 
+  strict_load_g: true
+
+# validation settings
+val:
+  save_img: true
+  rgb2bgr: true
+  suffix: ~  # add suffix to saved images, if None, use exp name
+
+  metrics:
+    psnr: # metric name, can be arbitrary
+      type: calculate_psnr
+      crop_border: 0
+      test_y_channel: false
+    ssim:
+      type: calculate_ssim
+      crop_border: 0
+      test_y_channel: false
